@@ -9,6 +9,8 @@
 <script src="https://unpkg.com/lucide@latest"></script>
 <!-- SortableJS for drag & drop -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<!-- Agent Registry (정의·프롬프트·UI) -->
+<script src="agents.js"></script>
 
 <style>
 /* ======================================================
@@ -371,6 +373,12 @@ input:focus, textarea:focus, select:focus {
 .agent-dot.error { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
 .agent-name { font-size: 13px; font-weight: 500; flex: 1; }
 .agent-time { font-size: 12px; color: var(--text-muted); }
+.agent-row:hover { background: var(--bg-hover); }
+
+/* Agent registry cards */
+.agent-card { padding: 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); }
+.agent-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--border-light); }
+.agent-group + .agent-group { margin-top: 8px; }
 
 /* Command input */
 .command-input-wrap {
@@ -860,6 +868,11 @@ input:focus, textarea:focus, select:focus {
         할 일
         <span class="nav-badge" id="todoBadge">0</span>
       </div>
+      <div class="nav-item" data-page="agents" onclick="navigate('agents')">
+        <i data-lucide="bot" style="width:18px;height:18px"></i>
+        에이전트
+        <span class="nav-badge" id="agentBadge">0</span>
+      </div>
       <div class="nav-item disabled" data-page="calendar">
         <i data-lucide="calendar" style="width:18px;height:18px"></i>
         일정
@@ -1018,6 +1031,30 @@ input:focus, textarea:focus, select:focus {
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeDataModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Agent Execution -->
+<div class="modal-backdrop" id="agentModal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <span id="agentModalTitle">에이전트</span>
+      <button onclick="AgentModule.closeModal()" style="padding:4px"><i data-lucide="x" style="width:18px;height:18px"></i></button>
+    </div>
+    <div class="modal-body" id="agentModalBody"></div>
+    <div class="modal-footer" style="flex-wrap:wrap;gap:8px">
+      <button class="btn btn-secondary btn-sm" onclick="AgentModule.preview()">
+        <i data-lucide="eye" style="width:14px;height:14px"></i> 프롬프트 미리보기
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="AgentModule.exportSkill()" title="Cowork에 설치 가능한 SKILL.md 파일로 다운로드">
+        <i data-lucide="download" style="width:14px;height:14px"></i> SKILL.md 내보내기
+      </button>
+      <div style="flex:1"></div>
+      <button class="btn btn-secondary" onclick="AgentModule.closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="AgentModule.copyAndRun()">
+        <i data-lucide="clipboard-copy" style="width:14px;height:14px"></i> 프롬프트 복사 + 실행
+      </button>
     </div>
   </div>
 </div>
@@ -1618,7 +1655,7 @@ function navigate(page) {
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.page === page);
   });
-  const titles = { home:'개요', todo:'할 일' };
+  const titles = { home:'개요', todo:'할 일', agents:'에이전트' };
   document.getElementById('pageTitle').textContent = titles[page] || '';
   renderPage();
   if (window.innerWidth <= 768) toggleSidebar(false);
@@ -1659,9 +1696,18 @@ function renderPage() {
   const main = document.getElementById('mainContent');
   if (currentPage === 'home') main.innerHTML = renderHome();
   else if (currentPage === 'todo') main.innerHTML = renderTodo();
+  else if (currentPage === 'agents') main.innerHTML = AgentModule.renderPage();
   updateTodoBadge();
+  updateAgentBadge();
   lucide.createIcons();
   if (currentPage === 'todo') TodoModule.init();
+}
+
+function updateAgentBadge() {
+  const el = document.getElementById('agentBadge');
+  if (el && typeof AGENT_REGISTRY !== 'undefined') {
+    el.textContent = AGENT_REGISTRY.length;
+  }
 }
 
 /* HOME PAGE */
@@ -1676,13 +1722,18 @@ function renderHome() {
   const totalDone = todos.filter(t => t.status === '완료').length;
   const totalPending = todos.filter(t => t.status !== '완료').length;
 
-  const agents = [
-    { name:'일일 요약 에이전트', status:'active', time:'오늘 08:00' },
-    { name:'마감 알림 에이전트', status:'active', time:'오늘 09:30' },
-    { name:'주간 리포트 에이전트', status:'inactive', time:'지난 월요일' },
-    { name:'데이터 백업 에이전트', status:'active', time:'오늘 06:00' },
-    { name:'리서치 수집 에이전트', status:'error', time:'어제 23:45' },
-  ];
+  // ── 에이전트 레지스트리 기반 (agents.js)
+  const agents = (typeof AGENT_REGISTRY !== 'undefined' ? AGENT_REGISTRY : []).slice(0, 6).map(a => {
+    const recent = (typeof AgentLayer !== 'undefined') ? AgentLayer.recentForAgent(a.id, 1)[0] : null;
+    return {
+      id: a.id,
+      name: a.name,
+      status: recent ? 'active' : 'inactive',
+      time: recent
+        ? new Date(recent.createdAt).toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+        : '아직 실행 안 함'
+    };
+  });
 
   // Obsidian-specific info for home
   let obsidianHomeInfo = '';
@@ -1775,13 +1826,18 @@ function renderHome() {
           <div class="card-title"><i data-lucide="cpu" style="width:16px;height:16px"></i> 에이전트 상태</div>
         </div>
         ${agents.map(a => `
-          <div class="agent-row">
+          <div class="agent-row" style="cursor:pointer" onclick="navigate('agents');setTimeout(()=>AgentModule.openModal('${a.id}'),60)">
             <div class="agent-dot ${a.status}"></div>
             <div class="agent-name">${a.name}</div>
             <div class="agent-time">${a.time}</div>
-            <span class="badge ${a.status==='active'?'badge-done':a.status==='error'?'badge-urgent':'badge-pending'}">${a.status==='active'?'활성':a.status==='error'?'에러':'비활성'}</span>
+            <span class="badge ${a.status==='active'?'badge-done':a.status==='error'?'badge-urgent':'badge-pending'}">${a.status==='active'?'활성':a.status==='error'?'에러':'대기'}</span>
           </div>
         `).join('')}
+        <div style="margin-top:10px;text-align:center">
+          <button class="btn btn-secondary btn-sm" onclick="navigate('agents')">
+            <i data-lucide="arrow-right" style="width:12px;height:12px"></i> 전체 에이전트 보기
+          </button>
+        </div>
       </div>
 
       <!-- Overdue / Quick Stats -->
@@ -1833,8 +1889,35 @@ function renderHome() {
 
 function handleCommand() {
   const input = document.getElementById('quickCommand');
-  if (!input.value.trim()) return;
-  alert('명령 처리 기능은 에이전트 연동 후 활성화됩니다.\n\n입력: ' + input.value);
+  const text = (input.value || '').trim();
+  if (!text) return;
+
+  // 키워드 기반 에이전트 매칭 (간단한 규칙)
+  const rules = [
+    { keys:['브리핑','briefing','포트폴리오','오늘 시장','주간 시장'], id:'portfolio-brief' },
+    { keys:['종목 분석','분석해','tier','티어','can slim','vcp'],     id:'investment-analyzer' },
+    { keys:['논문','paper','초안','abstract','introduction'],          id:'paper-writer' },
+    { keys:['자료조사','조사해','리서치','선행연구','review'],          id:'research-collector' },
+    { keys:['시뮬레이션','sfm','digital twin','디지털 트윈'],          id:'simulation-research' },
+    { keys:['기획서','과제 기획','rfp','제안'],                        id:'proposal-writer' },
+    { keys:['발표','슬라이드','deck','pptx','프레젠테이션'],            id:'presentation-builder' },
+    { keys:['주간 보고','업무 보고','일일 보고','월간 보고'],            id:'work-report-writer' },
+    { keys:['실적','cv','커리어','갭 분석'],                            id:'performance-tracker' }
+  ];
+  const lower = text.toLowerCase();
+  let matched = null;
+  for (const r of rules) {
+    if (r.keys.some(k => lower.includes(k.toLowerCase()))) { matched = r.id; break; }
+  }
+
+  if (matched && typeof AgentModule !== 'undefined') {
+    navigate('agents');
+    setTimeout(() => AgentModule.openModal(matched), 80);
+  } else {
+    // 에이전트 페이지로 이동만
+    navigate('agents');
+    AgentModule._toast?.(`'${text}'에 정확히 매칭되는 에이전트를 못 찾았어요. 카드에서 선택해주세요.`);
+  }
   input.value = '';
 }
 

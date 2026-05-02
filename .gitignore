@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 임시 메모/노트
+_gen_skills_note.txt
+
+# Node (필요해질 때를 대비)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
