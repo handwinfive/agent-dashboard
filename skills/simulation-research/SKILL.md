@@ -23,7 +23,7 @@ group_name: 연구 / 논문
   - 타입: text / 예시: flow rate, density, travel time, level of service 등
 
 ## Vault 저장 권장 위치
-`01.Project/연구/`
+`01.Project/A. (국가R&D) 환승역사/`
 
 ## 출력 형식
 실험 설계 + 코드 스켈레톤
@@ -53,7 +53,7 @@ group_name: 연구 / 논문
 5. **검증 전략** (unit test · 실측 비교 · sensitivity analysis)
 6. **잠재 리스크와 대안**
 
-저장 권장: `01.Project/연구/` (실험 노트 형식)
+저장 권장: `01.Project/A. (국가R&D) 환승역사/` (실험 노트 형식)
 
 ---
 

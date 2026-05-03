@@ -23,7 +23,7 @@ group_name: 업무
   - 타입: textarea / 예시: 3~5개 핵심 메시지
 
 ## Vault 저장 권장 위치
-`01.Project/연구/`
+`01.Project/A. (국가R&D) 환승역사/`
 
 ## 출력 형식
 슬라이드 개요 + 발표 노트
@@ -53,7 +53,7 @@ group_name: 업무
 4. **Q&A 예상 질문 5개와 답변 키워드**
 5. **다음 단계** — pptx 변환 명령 예시 (Cowork pptx skill 활용)
 
-저장 권장: `01.Project/연구/YYYY-MM-DD-{slug}-deck.md`
+저장 권장: `01.Project/A. (국가R&D) 환승역사/YYYY-MM-DD-{slug}-deck.md`
 
 ---
 

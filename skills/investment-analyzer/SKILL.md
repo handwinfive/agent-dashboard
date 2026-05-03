@@ -23,7 +23,7 @@ CAN SLIM/SEPA/VCP(나스닥) 또는 Graham/Magic Formula(KOSPI) 관점에서 종
   - 타입: textarea / 예시: 예: 어닝 직후, 베이스 형성 6주, RS 라인 신고가
 
 ## Vault 저장 권장 위치
-`02.Area/투자/Nasdaq/`
+`02.Area/E. 투자 및 자산관리/Daily Brief/`
 
 ## 출력 형식
 체크리스트 기반 점검 노트
@@ -58,7 +58,7 @@ CAN SLIM/SEPA/VCP(나스닥) 또는 Graham/Magic Formula(KOSPI) 관점에서 종
 7. **다음 관찰 시점**
 
 데이터는 가능한 한 최신을 가정하되, 확실치 않은 수치는 명시적으로 `(확인 필요)` 표기.
-저장 권장: `02.Area/투자/Nasdaq/` 또는 `02.Area/투자/KOSPI/`
+저장 권장: `02.Area/E. 투자 및 자산관리/Daily Brief/` 또는 `02.Area/E. 투자 및 자산관리/Daily Brief/`
 
 ---
 

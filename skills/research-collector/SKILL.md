@@ -23,7 +23,7 @@ group_name: 연구 / 논문
   - 타입: textarea / 예시: 예: SFM 기반 모델 한계와 AI 보완 가능성
 
 ## Vault 저장 권장 위치
-`03.Resource/Reading/`
+`03.Resource/`
 
 ## 출력 형식
 요약 보고서 (Markdown)
@@ -55,7 +55,7 @@ group_name: 연구 / 논문
 5. **다음 액션 제안** (3개)
 
 ## 저장 권장 위치
-완성 후 `03.Resource/Reading/` 아래 `YYYY-MM-DD-{slug}.md` 형태로 저장 제안.
+완성 후 `03.Resource/` 아래 `YYYY-MM-DD-{slug}.md` 형태로 저장 제안.
 
 ---
 

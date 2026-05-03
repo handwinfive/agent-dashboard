@@ -29,7 +29,7 @@ T3: NFLX
   - 타입: textarea / 예시: 예: 어닝 임박 종목, 신고가 후보, 손절 후보
 
 ## Vault 저장 권장 위치
-`02.Area/투자/Nasdaq/`
+`02.Area/E. 투자 및 자산관리/Daily Brief/`
 
 ## 출력 형식
 5단계 구조 브리핑 노트
@@ -66,7 +66,7 @@ CLAUDE.md 규약에 따라 정확히 5단계 구조로 작성한다.
 - **기존 포지션과 충돌 시 명시적 경고**
 - **확실치 않은 수치**는 `(확인 필요)` 라벨
 
-저장 권장: `02.Area/투자/Nasdaq/YYYY-MM-DD-brief.md`
+저장 권장: `02.Area/E. 투자 및 자산관리/Daily Brief/YYYY-MM-DD-brief.md`
 
 ---
 

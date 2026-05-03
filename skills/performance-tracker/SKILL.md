@@ -25,7 +25,7 @@ group_name: 업무
   - 타입: textarea / 예시: 예: SCI 1편, IEEE T-ITS 1편 투고, J-1 지원서 제출
 
 ## Vault 저장 권장 위치
-`02.Area/연구/`
+`02.Area/A. 논문연구 주제 정리/`
 
 ## 출력 형식
 실적 정리표 + 갭 분석
@@ -58,7 +58,7 @@ group_name: 업무
 4. **다음 분기 우선순위 제안** (3개)
 5. **CV/Personal Statement 반영 시 강조 포인트**
 
-저장 권장: `02.Area/연구/{year}-실적.md`
+저장 권장: `02.Area/A. 논문연구 주제 정리/{year}-실적.md`
 
 ---
 

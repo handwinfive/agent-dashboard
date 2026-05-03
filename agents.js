@@ -17,29 +17,32 @@ const AGENT_GROUPS = [
     description: '기획서 · 발표자료 · 보고 · 실적관리' }
 ];
 
-/* ───────── Vault 표준 경로 (CLAUDE.md 규약) ───────── */
+/* ───────── Vault 표준 경로 (실제 Vault 구조 반영) ─────────
+   CLAUDE.md의 가상 경로와 실제 폴더명이 다르므로, 실제 구조 기준으로
+   매핑한다 (예: '02.Area/E. 투자 및 자산관리/').                  */
 const VAULT_PATHS = {
   root:           '~/Vaults/MyVault',
-  daily:          '02.Area/Daily/',
-  weekly:         '02.Area/Weekly/',
-  research:       '01.Project/연구/',
-  area_research:  '02.Area/연구/',
-  reading:        '03.Resource/Reading/',
-  nasdaq:         '02.Area/투자/Nasdaq/',
-  kospi:          '02.Area/투자/KOSPI/',
+  daily:          '02.Area/B. 일정관리/',
+  weekly:         '02.Area/B. 일정관리/',
+  research:       '01.Project/A. (국가R&D) 환승역사/',
+  area_research:  '02.Area/A. 논문연구 주제 정리/',
+  reading:        '03.Resource/',
+  nasdaq:         '02.Area/E. 투자 및 자산관리/Daily Brief/',
+  kospi:          '02.Area/E. 투자 및 자산관리/Daily Brief/',
+  investing_root: '02.Area/E. 투자 및 자산관리/',
   attachments:    '04.Archive/Attachments/'
 };
 
 /* ───────── 에이전트 결과 파일 스캔 대상 폴더 ─────────
-   ObsidianSync.scanAgentResults() 가 이 경로들을 재귀 순회하며
-   frontmatter에 `agent: <id>` 가 있는 .md 파일을 결과로 인식한다.   */
+   ObsidianSync.scanAgentResults() 가 이 경로들을 depth 3까지 재귀
+   순회하여 frontmatter에 `agent: <id>` 가 있는 .md 파일을 인식한다.
+   상위 폴더만 지정하면 하위 모든 .md가 자동 검색된다.              */
 const AGENT_RESULT_DIRS = [
-  '01.Project/연구/',
-  '02.Area/연구/',
-  '02.Area/Weekly/',
-  '02.Area/투자/Nasdaq/',
-  '02.Area/투자/KOSPI/',
-  '03.Resource/Reading/'
+  '01.Project/',
+  '02.Area/A. 논문연구 주제 정리/',
+  '02.Area/B. 일정관리/',
+  '02.Area/E. 투자 및 자산관리/',
+  '03.Resource/'
 ];
 
 /* ───────── 공통 프롬프트 헤더 (모든 에이전트 공통 컨텍스트) ───────── */
@@ -430,7 +433,7 @@ ${v.keyPoints}
         placeholder: '예: SCI 1편, IEEE T-ITS 1편 투고, J-1 지원서 제출' }
     ],
     outputHint: '실적 정리표 + 갭 분석',
-    vaultSavePath: '02.Area/연구/',
+    vaultSavePath: VAULT_PATHS.area_research,
     buildPrompt(v) {
       return `${COMMON_PROMPT_HEADER}
 # 작업: 개인 실적 정리 + 미국 포지션 트랙 갭 분석
@@ -450,7 +453,7 @@ ${v.targets || '(미설정 - 함께 제안 요청)'}
 4. **다음 분기 우선순위 제안** (3개)
 5. **CV/Personal Statement 반영 시 강조 포인트**
 
-저장 권장: \`02.Area/연구/${v.year}-실적.md\``;
+저장 권장: \`${VAULT_PATHS.area_research}${v.year}-실적.md\``;
     }
   }
 ];

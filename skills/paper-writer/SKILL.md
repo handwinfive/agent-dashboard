@@ -25,7 +25,7 @@ Nature/IEEE 스타일 가이드를 따라 Abstract/Introduction/Methods/Results/
   - 타입: text
 
 ## Vault 저장 권장 위치
-`01.Project/연구/`
+`01.Project/A. (국가R&D) 환승역사/`
 
 ## 출력 형식
 논문 섹션 초안 + 인용 권장 자료
@@ -60,7 +60,7 @@ Nature/IEEE 스타일 가이드를 따라 Abstract/Introduction/Methods/Results/
 - **인용 후보 목록** (저자·연도·이유 한 줄)
 - **검토 포인트** (작성 후 사용자가 확인할 항목 3개)
 
-저장 권장: `01.Project/연구/`
+저장 권장: `01.Project/A. (국가R&D) 환승역사/`
 
 ---
 
