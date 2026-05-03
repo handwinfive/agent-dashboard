@@ -19,15 +19,28 @@ const AGENT_GROUPS = [
 
 /* ───────── Vault 표준 경로 (CLAUDE.md 규약) ───────── */
 const VAULT_PATHS = {
-  root:        '~/Vaults/MyVault',
-  daily:       '02.Area/Daily/',
-  weekly:      '02.Area/Weekly/',
-  research:    '01.Project/연구/',
-  reading:     '03.Resource/Reading/',
-  nasdaq:      '02.Area/투자/Nasdaq/',
-  kospi:       '02.Area/투자/KOSPI/',
-  attachments: '04.Archive/Attachments/'
+  root:           '~/Vaults/MyVault',
+  daily:          '02.Area/Daily/',
+  weekly:         '02.Area/Weekly/',
+  research:       '01.Project/연구/',
+  area_research:  '02.Area/연구/',
+  reading:        '03.Resource/Reading/',
+  nasdaq:         '02.Area/투자/Nasdaq/',
+  kospi:          '02.Area/투자/KOSPI/',
+  attachments:    '04.Archive/Attachments/'
 };
+
+/* ───────── 에이전트 결과 파일 스캔 대상 폴더 ─────────
+   ObsidianSync.scanAgentResults() 가 이 경로들을 재귀 순회하며
+   frontmatter에 `agent: <id>` 가 있는 .md 파일을 결과로 인식한다.   */
+const AGENT_RESULT_DIRS = [
+  '01.Project/연구/',
+  '02.Area/연구/',
+  '02.Area/Weekly/',
+  '02.Area/투자/Nasdaq/',
+  '02.Area/투자/KOSPI/',
+  '03.Resource/Reading/'
+];
 
 /* ───────── 공통 프롬프트 헤더 (모든 에이전트 공통 컨텍스트) ───────── */
 const COMMON_PROMPT_HEADER = `# 컨텍스트
@@ -479,6 +492,42 @@ const AgentLayer = {
   }
 };
 
+/* ───────── 결과 파일 frontmatter 규약 (모든 에이전트 공통 푸터) ─────────
+   결과를 .md로 저장할 때 이 frontmatter를 맨 위에 포함하면
+   대시보드 ObsidianSync 가 자동으로 카드로 노출한다.                    */
+function _agentResultFrontmatterFooter(agentId, inputs) {
+  const today = new Date().toISOString().slice(0, 10);
+  // 첫 번째 입력값을 inputs_summary 후보로 (사람이 보기 쉽게)
+  const firstVal = Object.values(inputs || {}).find(v => v && String(v).trim()) || '';
+  const summary = String(firstVal).split('\n')[0].slice(0, 60);
+  return `
+
+---
+
+## 결과 파일 작성 규약 (필수)
+
+이 작업의 결과를 .md 파일로 Vault에 저장할 때, **반드시** 다음 frontmatter를 파일 맨 위에 포함하라:
+
+\`\`\`yaml
+---
+agent: ${agentId}
+created: ${today}
+title: <한 줄 제목>
+inputs_summary: ${summary || '<핵심 입력 한 줄>'}
+tags: [agent-result]
+---
+\`\`\`
+
+이 frontmatter가 있어야 대시보드 홈/에이전트 모달의 "최근 결과" 위젯이 자동으로 인식하여 카드로 노출한다.
+파일명 권장 패턴: \`YYYY-MM-DD-${agentId}-{slug}.md\``;
+}
+
+/* 모든 에이전트의 buildPrompt 호출 결과에 위 푸터를 자동 추가 */
+function buildAgentPrompt(agent, values) {
+  const base = agent.buildPrompt(values);
+  return base + _agentResultFrontmatterFooter(agent.id, values);
+}
+
 /* ───────── Helpers ───────── */
 function _agentEsc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -635,13 +684,45 @@ const AgentModule = {
     const recentRuns = AgentLayer.recentForAgent(agentId, 3);
     const recentHtml = recentRuns.length === 0 ? '' : `
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color)">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">최근 실행</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">최근 실행 (프롬프트 복사 이력)</div>
         ${recentRuns.map(r => `
           <div style="font-size:12px;color:var(--text-secondary);padding:4px 0">
             <span style="color:var(--text-muted)">${new Date(r.createdAt).toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })}</span>
             · ${_agentEsc(Object.values(r.inputs)[0] || '').slice(0, 40)}
           </div>
         `).join('')}
+      </div>
+    `;
+
+    /* Vault에 저장된 결과 파일 (ObsidianSync 연동) */
+    const obsConnected = (typeof window !== 'undefined' && window.ObsidianSync && window.ObsidianSync.isConnected);
+    const vaultResults = obsConnected ? window.ObsidianSync.getAgentResults(agentId, 5) : [];
+    const vaultResultsHtml = !obsConnected ? `
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color)">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">결과 파일 (Vault)</div>
+        <div style="font-size:12px;color:var(--text-muted);background:var(--bg-tertiary);padding:8px 10px;border-radius:6px">
+          Vault 미연결 — 사이드바의 "볼트 연결"을 누르면 이 에이전트의 결과 파일이 여기에 표시됩니다.
+        </div>
+      </div>
+    ` : vaultResults.length === 0 ? `
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color)">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">결과 파일 (Vault)</div>
+        <div style="font-size:12px;color:var(--text-muted)">아직 인식된 결과 파일이 없습니다.</div>
+      </div>
+    ` : `
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color)">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">결과 파일 (Vault) · 최근 ${vaultResults.length}개</div>
+        ${vaultResults.map(r => {
+          const created = r.frontmatter.created || r.mtime || '';
+          const title = r.frontmatter.title || r.file.replace(/\.md$/i, '');
+          return `
+            <div style="padding:8px 10px;background:var(--bg-tertiary);border-radius:6px;margin-bottom:6px;border-left:2px solid var(--obsidian)">
+              <div style="font-size:13px;font-weight:600;margin-bottom:2px">${_agentEsc(title)}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${_agentEsc(created)} · <code>${_agentEsc(r.folder)}${_agentEsc(r.file)}</code></div>
+              ${r.preview ? `<div style="font-size:12px;color:var(--text-secondary);line-height:1.4">${_agentEsc(r.preview)}</div>` : ''}
+            </div>
+          `;
+        }).join('')}
       </div>
     `;
 
@@ -660,6 +741,7 @@ const AgentModule = {
         💡 출력 권장 위치: <code>${_agentEsc(a.vaultSavePath || VAULT_PATHS.root)}</code>
       </div>
       ${recentHtml}
+      ${vaultResultsHtml}
     `;
 
     document.getElementById('agentModalTitle').textContent = a.name;
@@ -692,7 +774,7 @@ const AgentModule = {
   preview() {
     const r = this._collectInputs();
     if (!r) return;
-    const prompt = r.agent.buildPrompt(r.values);
+    const prompt = buildAgentPrompt(r.agent, r.values);
     const ta = document.createElement('textarea');
     ta.value = prompt;
     ta.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;opacity:0';
@@ -714,7 +796,7 @@ const AgentModule = {
   async copyAndRun() {
     const r = this._collectInputs();
     if (!r) return;
-    const prompt = r.agent.buildPrompt(r.values);
+    const prompt = buildAgentPrompt(r.agent, r.values);
     try {
       await navigator.clipboard.writeText(prompt);
       AgentLayer.saveRun(r.agent.id, r.values, prompt);
@@ -756,7 +838,7 @@ const AgentModule = {
   },
 
   _buildSkillMd(a, values, asTemplate) {
-    const promptBody = a.buildPrompt(values);
+    const promptBody = buildAgentPrompt(a, values);
     return `---
 name: ${a.id}
 description: ${a.tagline}
@@ -810,3 +892,5 @@ window.AGENT_REGISTRY = AGENT_REGISTRY;
 window.AgentLayer = AgentLayer;
 window.AgentModule = AgentModule;
 window.VAULT_PATHS = VAULT_PATHS;
+window.AGENT_RESULT_DIRS = AGENT_RESULT_DIRS;
+window.buildAgentPrompt = buildAgentPrompt;

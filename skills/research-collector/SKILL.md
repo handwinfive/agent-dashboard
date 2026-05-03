@@ -56,4 +56,23 @@ group_name: 연구 / 논문
 
 ## 저장 권장 위치
 완성 후 `03.Resource/Reading/` 아래 `YYYY-MM-DD-{slug}.md` 형태로 저장 제안.
+
+---
+
+## 결과 파일 작성 규약 (필수)
+
+이 작업의 결과를 .md 파일로 Vault에 저장할 때, **반드시** 다음 frontmatter를 파일 맨 위에 포함하라:
+
+```yaml
+---
+agent: research-collector
+created: 2026-05-03
+title: <한 줄 제목>
+inputs_summary: {topic}
+tags: [agent-result]
+---
+```
+
+이 frontmatter가 있어야 대시보드 홈/에이전트 모달의 "최근 결과" 위젯이 자동으로 인식하여 카드로 노출한다.
+파일명 권장 패턴: `YYYY-MM-DD-research-collector-{slug}.md`
 ```

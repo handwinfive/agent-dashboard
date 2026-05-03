@@ -67,4 +67,23 @@ CLAUDE.md 규약에 따라 정확히 5단계 구조로 작성한다.
 - **확실치 않은 수치**는 `(확인 필요)` 라벨
 
 저장 권장: `02.Area/투자/Nasdaq/YYYY-MM-DD-brief.md`
+
+---
+
+## 결과 파일 작성 규약 (필수)
+
+이 작업의 결과를 .md 파일로 Vault에 저장할 때, **반드시** 다음 frontmatter를 파일 맨 위에 포함하라:
+
+```yaml
+---
+agent: portfolio-brief
+created: 2026-05-03
+title: <한 줄 제목>
+inputs_summary: {period}
+tags: [agent-result]
+---
+```
+
+이 frontmatter가 있어야 대시보드 홈/에이전트 모달의 "최근 결과" 위젯이 자동으로 인식하여 카드로 노출한다.
+파일명 권장 패턴: `YYYY-MM-DD-portfolio-brief-{slug}.md`
 ```

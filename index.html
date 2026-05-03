@@ -1092,6 +1092,8 @@ const ObsidianSync = {
   _selectedWeek: null,  // filename
   _cachedTodos: [],     // parsed todos for selected week
   _allWeekTodos: {},    // filename -> todos cache
+  _agentResults: [],    // [{agentId, file, folder, frontmatter, mtime, preview, fullPath}]
+  _agentResultsScanAt: null,
 
   get isSupported() {
     return 'showDirectoryPicker' in window;
@@ -1288,12 +1290,95 @@ const ObsidianSync = {
         await this._loadWeekTodos(this._selectedWeek);
       }
 
+      // 에이전트 결과 파일 스캔 (실패해도 todo 동기화는 유지)
+      try { await this.scanAgentResults(); }
+      catch (err) { console.warn('Agent results scan failed:', err.message); }
+
       this._lastSync = new Date();
       this._updateStatusUI();
     } catch (err) {
       console.error('Obsidian sync error:', err);
       alert('Obsidian 동기화 실패: ' + err.message);
     }
+  },
+
+  /* ============================================================
+     에이전트 결과 파일 스캔
+     - agents.js의 AGENT_RESULT_DIRS 폴더들을 재귀 순회
+     - frontmatter에 `agent: <id>` 가 있는 .md 파일을 결과로 인식
+     - 결과는 this._agentResults 에 저장 (created 내림차순)
+     ============================================================ */
+  async scanAgentResults() {
+    if (!this.isConnected) return;
+    const dirs = (typeof window !== 'undefined' && window.AGENT_RESULT_DIRS) || [];
+    if (!dirs.length) { this._agentResults = []; return; }
+
+    const results = [];
+    for (const dirPath of dirs) {
+      try { await this._scanDirForResults(dirPath, results, 0); }
+      catch (err) { /* 폴더 없음 — skip */ }
+    }
+    // created (frontmatter) → mtime 순으로 내림차순 정렬
+    results.sort((a, b) => {
+      const ad = a.frontmatter.created || a.mtime || '';
+      const bd = b.frontmatter.created || b.mtime || '';
+      return String(bd).localeCompare(String(ad));
+    });
+    this._agentResults = results;
+    this._agentResultsScanAt = new Date();
+  },
+
+  async _scanDirForResults(pathStr, accumulator, depth) {
+    if (depth > 3) return;  // recursion limit
+    const segments = pathStr.split('/').filter(Boolean);
+    let dir = this._dirHandle;
+    for (const seg of segments) {
+      try { dir = await dir.getDirectoryHandle(seg); }
+      catch { return; }  // missing folder — silently skip
+    }
+    for await (const entry of dir.values()) {
+      if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.md')) {
+        try {
+          const file = await entry.getFile();
+          const content = await file.text();
+          const fm = this._parseFrontmatter(content);
+          if (fm.agent) {
+            accumulator.push({
+              agentId: String(fm.agent).trim(),
+              file: entry.name,
+              folder: pathStr,
+              fullPath: pathStr + entry.name,
+              frontmatter: fm,
+              mtime: file.lastModified ? new Date(file.lastModified).toISOString().slice(0, 10) : null,
+              size: file.size,
+              preview: this._extractAgentPreview(content)
+            });
+          }
+        } catch (err) { /* skip unreadable file */ }
+      } else if (entry.kind === 'directory') {
+        await this._scanDirForResults(pathStr + entry.name + '/', accumulator, depth + 1);
+      }
+    }
+  },
+
+  _extractAgentPreview(content, maxLen = 200) {
+    const body = content.replace(/^---[\s\S]*?---\n?/, '').trim();
+    const text = body
+      .replace(/^#+\s*/gm, '')                    // strip headers
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')   // unwrap markdown links
+      .replace(/[*_`>]/g, '')                    // strip emphasis chars
+      .replace(/\n+/g, ' ')                      // collapse newlines
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return text.slice(0, maxLen) + (text.length > maxLen ? '…' : '');
+  },
+
+  getAgentResults(agentId, limit = 5) {
+    return (this._agentResults || []).filter(r => r.agentId === agentId).slice(0, limit);
+  },
+
+  getAllAgentResults(limit = 10) {
+    return (this._agentResults || []).slice(0, limit);
   },
 
   async _loadWeekTodos(filename) {
@@ -1713,6 +1798,7 @@ function updateAgentBadge() {
 /* HOME PAGE */
 function renderHome() {
   const isObs = todoDataSource === 'obsidian' && ObsidianSync.isConnected;
+  const obsConnectedHome = ObsidianSync.isConnected;  // 결과 카드용 (todoDataSource 무관)
   const todos = isObs ? ObsidianSync.getTodos() : DataLayer.getAll();
   const todayStr = fmt(today);
   const todayTodos = todos.filter(t => t.dueDate === todayStr);
@@ -1801,22 +1887,32 @@ function renderHome() {
           <div class="summary-sub" style="color:var(--accent)">준비 중</div>
         </div>
       </div>
-      <div class="summary-card">
-        <div class="summary-icon blue"><i data-lucide="book-open" style="width:20px;height:20px"></i></div>
-        <div>
-          <div class="summary-value" style="color:var(--text-muted);font-size:16px">—</div>
-          <div class="summary-label">최근 연구 리포트</div>
-          <div class="summary-sub" style="color:var(--accent)">준비 중</div>
+      ${(() => {
+        const allRes = (isObs && obsConnectedHome) ? ObsidianSync.getAllAgentResults(999) : [];
+        const total  = allRes.length;
+        const todayKey = fmt(today);
+        const todayCnt = allRes.filter(r => (r.frontmatter.created || r.mtime) === todayKey).length;
+        // "투자" 그룹 결과 (Nasdaq · KOSPI 폴더 기반)
+        const invCnt = allRes.filter(r => (r.folder || '').includes('투자')).length;
+        return `
+        <div class="summary-card">
+          <div class="summary-icon blue"><i data-lucide="file-text" style="width:20px;height:20px"></i></div>
+          <div>
+            <div class="summary-value">${total}</div>
+            <div class="summary-label">에이전트 결과</div>
+            <div class="summary-sub">${isObs && obsConnectedHome ? `오늘 ${todayCnt}개 신규` : 'Vault 미연결'}</div>
+          </div>
         </div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-icon yellow"><i data-lucide="bar-chart-3" style="width:20px;height:20px"></i></div>
-        <div>
-          <div class="summary-value" style="color:var(--text-muted);font-size:16px">—</div>
-          <div class="summary-label">분석 알림</div>
-          <div class="summary-sub" style="color:var(--accent)">준비 중</div>
+        <div class="summary-card">
+          <div class="summary-icon yellow"><i data-lucide="trending-up" style="width:20px;height:20px"></i></div>
+          <div>
+            <div class="summary-value">${invCnt}</div>
+            <div class="summary-label">투자 분석/브리핑</div>
+            <div class="summary-sub" style="color:${invCnt>0?'var(--success)':'var(--text-muted)'}">${invCnt>0?'누적 결과':'아직 없음'}</div>
+          </div>
         </div>
-      </div>
+        `;
+      })()}
     </div>
 
     <div class="grid-3" style="gap:24px">
@@ -1872,19 +1968,91 @@ function renderHome() {
       </div>
     </div>
 
+    <!-- 최근 에이전트 결과 (Vault) -->
+    ${renderRecentAgentResults(obsConnectedHome)}
+
     <!-- Quick Command -->
     <div class="card" style="margin-top:24px">
       <div class="card-header">
         <div class="card-title"><i data-lucide="terminal" style="width:16px;height:16px"></i> 빠른 명령</div>
-        <div class="card-subtitle">자연어로 지시하세요 (예정)</div>
+        <div class="card-subtitle">키워드로 에이전트를 자동 매칭합니다 (예: "포트폴리오 브리핑")</div>
       </div>
       <div class="command-input-wrap">
         <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--accent);flex-shrink:0"></i>
-        <input type="text" placeholder="예: 이번 주 할 일 정리해줘, 내일 미팅 준비해줘..." id="quickCommand" onkeydown="if(event.key==='Enter')handleCommand()">
+        <input type="text" placeholder="예: 포트폴리오 브리핑, 자료조사, 주간 보고 작성..." id="quickCommand" onkeydown="if(event.key==='Enter')handleCommand()">
         <button class="btn btn-primary btn-sm" onclick="handleCommand()">실행</button>
       </div>
     </div>
   </div>`;
+}
+
+/* ────────────────────────────────────────────────
+   최근 에이전트 결과 카드 (Vault frontmatter 기반)
+   ──────────────────────────────────────────────── */
+function renderRecentAgentResults(connected) {
+  if (!connected) {
+    return `
+      <div class="card" style="margin-top:24px;border-color:rgba(168,85,247,0.18)">
+        <div class="card-header">
+          <div class="card-title" style="color:var(--obsidian)"><i data-lucide="file-stack" style="width:16px;height:16px"></i> 최근 에이전트 결과</div>
+          <div class="card-subtitle">Vault 연결 시 자동 표시</div>
+        </div>
+        <div style="padding:14px 0;color:var(--text-muted);font-size:13px;text-align:center">
+          좌측 사이드바의 <strong>볼트 연결</strong> 버튼을 눌러 Vault를 연결하면,<br>
+          에이전트가 작성한 결과 파일이 여기에 자동으로 모입니다.
+          <div style="margin-top:8px;font-size:11px">결과 파일은 frontmatter에 <code>agent: &lt;id&gt;</code> 가 포함된 .md 입니다.</div>
+        </div>
+      </div>`;
+  }
+  const results = ObsidianSync.getAllAgentResults(8);
+  if (results.length === 0) {
+    return `
+      <div class="card" style="margin-top:24px;border-color:rgba(168,85,247,0.18)">
+        <div class="card-header">
+          <div class="card-title" style="color:var(--obsidian)"><i data-lucide="file-stack" style="width:16px;height:16px"></i> 최근 에이전트 결과</div>
+          <span class="badge badge-obsidian">0건</span>
+        </div>
+        <div style="padding:14px 0;color:var(--text-muted);font-size:13px;text-align:center">
+          아직 인식된 결과 파일이 없습니다.<br>
+          <div style="margin-top:6px;font-size:12px">에이전트 모달의 <strong>프롬프트 복사 + 실행</strong> 후, Cowork·Claude Code에서 작성한 결과 .md 파일을 Vault에 저장하세요.</div>
+          <div style="margin-top:6px;font-size:11px">스캔 폴더: <code>${(window.AGENT_RESULT_DIRS||[]).join(', ')}</code></div>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="card" style="margin-top:24px;border-color:rgba(168,85,247,0.25)">
+      <div class="card-header">
+        <div class="card-title" style="color:var(--obsidian)"><i data-lucide="file-stack" style="width:16px;height:16px"></i> 최근 에이전트 결과</div>
+        <span class="badge badge-obsidian">${(ObsidianSync._agentResults||[]).length}건</span>
+      </div>
+      <div>
+        ${results.map(r => {
+          const a = (window.AGENT_REGISTRY||[]).find(x => x.id === r.agentId);
+          const agentName = a ? a.name : r.agentId;
+          const agentIcon = a ? a.icon : 'file-text';
+          const created = r.frontmatter.created || r.mtime || '';
+          const title = r.frontmatter.title || r.file.replace(/\.md$/i, '');
+          return `
+            <div class="agent-row" style="cursor:pointer;align-items:flex-start;padding:10px 0" onclick="navigate('agents');setTimeout(()=>AgentModule.openModal('${r.agentId}'),60)">
+              <div style="width:28px;height:28px;border-radius:6px;background:var(--obsidian-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <i data-lucide="${agentIcon}" style="width:14px;height:14px;color:var(--obsidian)"></i>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;margin-bottom:2px">${escHtml(title)}</div>
+                <div style="font-size:11px;color:var(--text-muted);display:flex;gap:8px;align-items:center">
+                  <span>${escHtml(agentName)}</span>
+                  <span>·</span>
+                  <span>${escHtml(created)}</span>
+                  <span>·</span>
+                  <span style="color:var(--text-muted)">${escHtml(r.folder)}${escHtml(r.file)}</span>
+                </div>
+                ${r.preview ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;line-height:1.4">${escHtml(r.preview)}</div>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>`;
 }
 
 function handleCommand() {

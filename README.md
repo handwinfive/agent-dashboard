@@ -144,6 +144,32 @@ agent-dashboard/
   - Nasdaq / KOSPI 브리핑: `02.Area/투자/{Nasdaq,KOSPI}/`
 - Cowork·Claude Code에서 프롬프트 실행 시, 이 경로들이 자동으로 참조됩니다.
 
+### 🔄 결과 파일 자동 인식 (양방향)
+
+각 에이전트의 프롬프트 끝에 **결과 파일 frontmatter 규약**이 자동으로 포함됩니다. Cowork·Claude Code가 결과를 `.md`로 저장할 때 다음 frontmatter를 포함하면, 대시보드가 자동으로 인식합니다.
+
+```yaml
+---
+agent: portfolio-brief
+created: 2026-05-03
+title: 일일 투자 브리핑
+inputs_summary: Nasdaq · 일일
+tags: [agent-result]
+---
+```
+
+**스캔 폴더** (`AGENT_RESULT_DIRS`):
+- `01.Project/연구/`, `02.Area/연구/`, `02.Area/Weekly/`
+- `02.Area/투자/Nasdaq/`, `02.Area/투자/KOSPI/`
+- `03.Resource/Reading/`
+
+대시보드에서 **볼트 연결**을 클릭하면 위 폴더들을 재귀 스캔하여 frontmatter에 `agent: <id>` 가 있는 파일을 결과로 인식하고, 다음 위젯에 표시합니다:
+
+- **홈 화면**: "최근 에이전트 결과" 카드 (최신 8개) + 상단 요약 카드(에이전트 결과 누적·투자 분석/브리핑)
+- **에이전트 모달**: 해당 에이전트의 결과 파일 최신 5개 (제목 · 날짜 · 미리보기)
+
+> 결과 파일은 대시보드가 직접 만들지 않습니다. Cowork/Claude Code에서 사용자가 프롬프트를 실행한 결과를 Vault에 저장하면, Obsidian Git이 동기화한 후 대시보드가 표시합니다.
+
 ---
 
 ## 🛠️ 에이전트 추가·수정

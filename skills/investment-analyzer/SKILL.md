@@ -59,4 +59,23 @@ CAN SLIM/SEPA/VCP(나스닥) 또는 Graham/Magic Formula(KOSPI) 관점에서 종
 
 데이터는 가능한 한 최신을 가정하되, 확실치 않은 수치는 명시적으로 `(확인 필요)` 표기.
 저장 권장: `02.Area/투자/Nasdaq/` 또는 `02.Area/투자/KOSPI/`
+
+---
+
+## 결과 파일 작성 규약 (필수)
+
+이 작업의 결과를 .md 파일로 Vault에 저장할 때, **반드시** 다음 frontmatter를 파일 맨 위에 포함하라:
+
+```yaml
+---
+agent: investment-analyzer
+created: 2026-05-03
+title: <한 줄 제목>
+inputs_summary: {ticker}
+tags: [agent-result]
+---
+```
+
+이 frontmatter가 있어야 대시보드 홈/에이전트 모달의 "최근 결과" 위젯이 자동으로 인식하여 카드로 노출한다.
+파일명 권장 패턴: `YYYY-MM-DD-investment-analyzer-{slug}.md`
 ```

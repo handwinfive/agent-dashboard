@@ -12,14 +12,14 @@ const wrapped = `
   const document = { getElementById: () => null };
   const navigator = {};
   ${code}
-  this.__OUT__ = { AGENT_GROUPS, AGENT_REGISTRY, VAULT_PATHS };
+  this.__OUT__ = { AGENT_GROUPS, AGENT_REGISTRY, VAULT_PATHS, buildAgentPrompt };
 `;
 
 const sandbox = { console, window: {} };
 vm.createContext(sandbox);
 vm.runInContext(wrapped, sandbox);
 
-const { AGENT_GROUPS, AGENT_REGISTRY, VAULT_PATHS } = sandbox.__OUT__;
+const { AGENT_GROUPS, AGENT_REGISTRY, VAULT_PATHS, buildAgentPrompt } = sandbox.__OUT__;
 
 console.log('Groups:', AGENT_GROUPS.length, 'Agents:', AGENT_REGISTRY.length);
 
@@ -32,7 +32,7 @@ for (const a of AGENT_REGISTRY) {
 
   const tplValues = {};
   a.inputs.forEach(inp => { tplValues[inp.id] = '{' + inp.id + '}'; });
-  const promptTemplate = a.buildPrompt(tplValues);
+  const promptTemplate = buildAgentPrompt(a, tplValues);
 
   const inputsList = a.inputs.map(inp => {
     const req = inp.required ? ' *(필수)*' : '';

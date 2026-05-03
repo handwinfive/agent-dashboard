@@ -59,4 +59,23 @@ group_name: 업무
 5. **CV/Personal Statement 반영 시 강조 포인트**
 
 저장 권장: `02.Area/연구/{year}-실적.md`
+
+---
+
+## 결과 파일 작성 규약 (필수)
+
+이 작업의 결과를 .md 파일로 Vault에 저장할 때, **반드시** 다음 frontmatter를 파일 맨 위에 포함하라:
+
+```yaml
+---
+agent: performance-tracker
+created: 2026-05-03
+title: <한 줄 제목>
+inputs_summary: {year}
+tags: [agent-result]
+---
+```
+
+이 frontmatter가 있어야 대시보드 홈/에이전트 모달의 "최근 결과" 위젯이 자동으로 인식하여 카드로 노출한다.
+파일명 권장 패턴: `YYYY-MM-DD-performance-tracker-{slug}.md`
 ```
