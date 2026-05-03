@@ -11,8 +11,6 @@
 const AGENT_GROUPS = [
   { id: 'research',  name: '연구 / 논문', icon: 'flask-conical', color: 'blue',
     description: 'KRRI 연구 · 논문 · 시뮬레이션 보조' },
-  { id: 'investing', name: '투자',         icon: 'trending-up',   color: 'green',
-    description: 'Nasdaq · KOSPI 분석과 브리핑' },
   { id: 'work',      name: '업무',         icon: 'briefcase',     color: 'purple',
     description: '기획서 · 발표자료 · 보고 · 실적관리' }
 ];
@@ -27,9 +25,6 @@ const VAULT_PATHS = {
   research:       '01.Project/A. (국가R&D) 환승역사/',
   area_research:  '02.Area/A. 논문연구 주제 정리/',
   reading:        '03.Resource/',
-  nasdaq:         '02.Area/E. 투자 및 자산관리/Daily Brief/',
-  kospi:          '02.Area/E. 투자 및 자산관리/Daily Brief/',
-  investing_root: '02.Area/E. 투자 및 자산관리/',
   attachments:    '04.Archive/Attachments/'
 };
 
@@ -41,7 +36,6 @@ const AGENT_RESULT_DIRS = [
   '01.Project/',
   '02.Area/A. 논문연구 주제 정리/',
   '02.Area/B. 일정관리/',
-  '02.Area/E. 투자 및 자산관리/',
   '03.Resource/'
 ];
 
@@ -183,104 +177,7 @@ const AGENT_REGISTRY = [
     }
   },
 
-  /* ─────────── 4. 투자분석 ─────────── */
-  {
-    id: 'investment-analyzer',
-    groupId: 'investing',
-    name: '투자분석 에이전트',
-    icon: 'line-chart',
-    tagline: '종목 → 펀더멘털 + 기술 트리거 점검',
-    description: 'CAN SLIM/SEPA/VCP(나스닥) 또는 Graham/Magic Formula(KOSPI) 관점에서 종목을 점검합니다. 매수·매도 추천은 하지 않습니다.',
-    inputs: [
-      { id: 'ticker',   label: '종목 티커',       type: 'text',     required: true,
-        placeholder: '예: NVDA, MRVL, 삼성전자' },
-      { id: 'market',   label: '시장',           type: 'select',   default: 'Nasdaq',
-        options: ['Nasdaq','KOSPI'] },
-      { id: 'tier',     label: '티어 분류',       type: 'select',   default: 'T1',
-        options: ['T1 (코어)','T2 (사이클 예외)','T3','신규 후보'] },
-      { id: 'context',  label: '관찰 맥락',       type: 'textarea', required: false,
-        placeholder: '예: 어닝 직후, 베이스 형성 6주, RS 라인 신고가' }
-    ],
-    outputHint: '체크리스트 기반 점검 노트',
-    vaultSavePath: VAULT_PATHS.nasdaq,
-    buildPrompt(v) {
-      const isUS = v.market === 'Nasdaq';
-      const framework = isUS
-        ? 'CAN SLIM + SEPA + VCP 돌파 매수 (William O\'Neil, Mark Minervini)'
-        : 'Graham Safety Filter + Magic Formula (Joel Greenblatt)';
-      return `${COMMON_PROMPT_HEADER}
-# 작업: 투자 분석 (트리거 충족 여부 점검)
-**중요 규칙**: 매수/매도를 추천하지 않는다. 트리거 충족 여부와 위험 요소만 객관적으로 정리한다.
-
-- **티커**: ${v.ticker}
-- **시장**: ${v.market}
-- **티어**: ${v.tier}
-- **관찰 맥락**: ${v.context || '(특별히 없음)'}
-- **분석 프레임워크**: ${framework}
-
-## 출력 구성
-1. **종목 한줄 요약** (사업 모델 + 최근 변화)
-2. **펀더멘털 체크** (EPS 성장률, 매출, 마진, 부채)
-3. **기술적 트리거** (베이스 패턴, RS, 거래량, 핵심 지지/저항)
-4. **복합 트리거 점검표** | 항목 | 충족 | 비고 |
-5. **리스크 요인** (3개)
-6. **포지션 사이징 시 고려사항** (티어별 표준 vs 현 상황)
-7. **다음 관찰 시점**
-
-데이터는 가능한 한 최신을 가정하되, 확실치 않은 수치는 명시적으로 \`(확인 필요)\` 표기.
-저장 권장: \`${VAULT_PATHS.nasdaq}\` 또는 \`${VAULT_PATHS.kospi}\``;
-    }
-  },
-
-  /* ─────────── 5. 투자현황 브리핑 ─────────── */
-  {
-    id: 'portfolio-brief',
-    groupId: 'investing',
-    name: '투자현황 브리핑 에이전트',
-    icon: 'newspaper',
-    tagline: 'CLAUDE.md 규약 기반 5단계 브리핑',
-    description: '시장 환경 → 티어별 보유 → 트리거 체크 → 신규 후보 → 실행 플랜 순서로 일일/주간 브리핑을 작성합니다.',
-    inputs: [
-      { id: 'period',     label: '브리핑 주기',   type: 'select',   default: '일일',
-        options: ['일일','주간'] },
-      { id: 'market',     label: '대상 시장',     type: 'select',   default: 'Nasdaq',
-        options: ['Nasdaq','KOSPI','두 시장 모두'] },
-      { id: 'holdings',   label: '현재 보유 종목',type: 'textarea', required: true,
-        placeholder: 'T1: NVDA, GOOGL, AVGO\nT2: MRVL, MU\nT3: NFLX\n신규: CRDO',
-        default: 'T1 (코어): NVDA, GOOGL, AVGO\nT2 (사이클 예외): MRVL, MU\nT3: NFLX\n신규: CRDO' },
-      { id: 'concerns',   label: '특별 관심사',   type: 'textarea', required: false,
-        placeholder: '예: 어닝 임박 종목, 신고가 후보, 손절 후보' }
-    ],
-    outputHint: '5단계 구조 브리핑 노트',
-    vaultSavePath: VAULT_PATHS.nasdaq,
-    buildPrompt(v) {
-      return `${COMMON_PROMPT_HEADER}
-# 작업: ${v.period} 투자 브리핑
-
-CLAUDE.md 규약에 따라 정확히 5단계 구조로 작성한다.
-
-- **대상 시장**: ${v.market}
-- **현재 보유 종목**:
-${v.holdings}
-- **특별 관심사**: ${v.concerns || '(특별히 없음)'}
-
-## 5단계 구조 (반드시 이 순서)
-1. **시장 환경** — 인덱스 (S&P, Nasdaq, KOSPI), 원유, VIX, 금리, 지정학 이벤트
-2. **티어별 보유 종목** — T1/T2/T3별 현재 상태, 차트 위치, 직전 어닝 요약
-3. **매수 트리거 체크 (복합 트리거)** — 종목별 충족/미충족 점검
-4. **신규 후보 / 관망 종목** — 새로 등장한 베이스, 관망 중인 종목
-5. **실행 플랜** — 오늘/이번 주 모니터링 항목과 알림 설정 제안
-
-## 규칙 (필수)
-- **매수/매도 추천 금지** — 트리거 충족 여부만 객관적 기술
-- **기존 포지션과 충돌 시 명시적 경고**
-- **확실치 않은 수치**는 \`(확인 필요)\` 라벨
-
-저장 권장: \`${VAULT_PATHS.nasdaq}YYYY-MM-DD-brief.md\``;
-    }
-  },
-
-  /* ─────────── 6. 기획서 작성 ─────────── */
+  /* ─────────── 4. 기획서 작성 ─────────── */
   {
     id: 'proposal-writer',
     groupId: 'work',
@@ -329,7 +226,7 @@ ${v.goals}
     }
   },
 
-  /* ─────────── 7. 발표자료 작성 ─────────── */
+  /* ─────────── 5. 발표자료 작성 ─────────── */
   {
     id: 'presentation-builder',
     groupId: 'work',
@@ -368,7 +265,7 @@ ${v.keyPoints}
     }
   },
 
-  /* ─────────── 8. 업무보고 작성 ─────────── */
+  /* ─────────── 6. 업무보고 작성 ─────────── */
   {
     id: 'work-report-writer',
     groupId: 'work',
@@ -417,7 +314,7 @@ ${v.keyPoints}
     }
   },
 
-  /* ─────────── 9. 개인실적관리 ─────────── */
+  /* ─────────── 7. 개인실적관리 ─────────── */
   {
     id: 'performance-tracker',
     groupId: 'work',

@@ -1,6 +1,8 @@
 # Agent Workbench
 
-손승오 (KRRI) 의 업무지원 대시보드. 단일 HTML 페이지(`index.html`)와 에이전트 레지스트리(`agents.js`), 그리고 Cowork·Claude Code에 설치 가능한 9개 SKILL 파일(`skills/`)로 구성됩니다.
+손승오 (KRRI) 의 업무지원 대시보드. 단일 HTML 페이지(`index.html`)와 에이전트 레지스트리(`agents.js`), 그리고 Cowork·Claude Code에 설치 가능한 7개 SKILL 파일(`skills/`)로 구성됩니다.
+
+> 2026-05-03: 투자 관련 에이전트(투자분석 / 투자현황 브리핑)는 별도 운영 방식 정리 후 재추가 예정으로 본 대시보드에서 제외되었습니다. (투자 브리핑은 주로 아이폰 Claude 채팅으로 운영 — 파일 시스템 자동 동기화 어려움)
 
 ---
 
@@ -59,12 +61,10 @@ git push
 agent-dashboard/
 ├── index.html          ← 단일 페이지 대시보드 (다크/라이트, 사이드바, 모듈)
 ├── agents.js           ← 9개 에이전트 정의 + AgentModule(UI) + AgentLayer(로컬스토리지)
-├── skills/             ← Cowork/Claude Code에 설치 가능한 SKILL.md 9개
+├── skills/             ← Cowork/Claude Code에 설치 가능한 SKILL.md 7개
 │   ├── research-collector/SKILL.md
 │   ├── paper-writer/SKILL.md
 │   ├── simulation-research/SKILL.md
-│   ├── investment-analyzer/SKILL.md
-│   ├── portfolio-brief/SKILL.md
 │   ├── proposal-writer/SKILL.md
 │   ├── presentation-builder/SKILL.md
 │   ├── work-report-writer/SKILL.md
@@ -77,7 +77,7 @@ agent-dashboard/
 
 ---
 
-## 🤖 에이전트 (3그룹 × 9개)
+## 🤖 에이전트 (2그룹 × 7개)
 
 ### 연구 / 논문
 | ID | 이름 | 한 줄 |
@@ -85,12 +85,6 @@ agent-dashboard/
 | `research-collector`   | 자료조사 에이전트       | 주제 → 핵심 자료·논문 요약 |
 | `paper-writer`         | 논문작성 에이전트       | 아이디어 → 논문 섹션 학술 초안 |
 | `simulation-research`  | 시뮬레이션 연구 에이전트 | SFM · 디지털 트윈 연구 보조 |
-
-### 투자
-| ID | 이름 | 한 줄 |
-|---|---|---|
-| `investment-analyzer` | 투자분석 에이전트       | 종목 → 펀더멘털 + 기술 트리거 점검 |
-| `portfolio-brief`     | 투자현황 브리핑 에이전트 | CLAUDE.md 규약 기반 5단계 브리핑 |
 
 ### 업무
 | ID | 이름 | 한 줄 |
@@ -121,8 +115,6 @@ agent-dashboard/
 
 | 키워드 | 매칭되는 에이전트 |
 |---|---|
-| 브리핑 / briefing / 포트폴리오 | `portfolio-brief` |
-| 종목 분석 / can slim / vcp / tier | `investment-analyzer` |
 | 논문 / paper / abstract | `paper-writer` |
 | 자료조사 / 리서치 / 선행연구 | `research-collector` |
 | 시뮬레이션 / sfm / digital twin | `simulation-research` |
@@ -136,12 +128,12 @@ agent-dashboard/
 ## 📁 Vault 연동 정책
 
 - 모든 에이전트의 프롬프트는 **CLAUDE.md(`~/Vaults/MyVault/CLAUDE.md`) 규약**을 컨텍스트 헤더로 포함합니다.
-- Vault 표준 경로 (`agents.js` 의 `VAULT_PATHS`):
-  - 데일리: `02.Area/Daily/`
-  - 주간 리뷰: `02.Area/Weekly/`
-  - 연구: `01.Project/연구/`
-  - 읽은 자료: `03.Resource/Reading/`
-  - Nasdaq / KOSPI 브리핑: `02.Area/투자/{Nasdaq,KOSPI}/`
+- Vault 표준 경로 (`agents.js` 의 `VAULT_PATHS`, 실제 Vault 구조 기준):
+  - 데일리/주간: `02.Area/B. 일정관리/`
+  - 연구 프로젝트: `01.Project/A. (국가R&D) 환승역사/`
+  - 논문연구: `02.Area/A. 논문연구 주제 정리/`
+  - 읽은 자료: `03.Resource/`
+  - 첨부파일: `04.Archive/Attachments/`
 - Cowork·Claude Code에서 프롬프트 실행 시, 이 경로들이 자동으로 참조됩니다.
 
 ### 🔄 결과 파일 자동 인식 (양방향)
@@ -150,22 +142,23 @@ agent-dashboard/
 
 ```yaml
 ---
-agent: portfolio-brief
+agent: paper-writer
 created: 2026-05-03
-title: 일일 투자 브리핑
-inputs_summary: Nasdaq · 일일
+title: 논문 초안 — 대심도 보행자 SFM
+inputs_summary: introduction · 한국어
 tags: [agent-result]
 ---
 ```
 
 **스캔 폴더** (`AGENT_RESULT_DIRS`):
-- `01.Project/연구/`, `02.Area/연구/`, `02.Area/Weekly/`
-- `02.Area/투자/Nasdaq/`, `02.Area/투자/KOSPI/`
-- `03.Resource/Reading/`
+- `01.Project/`
+- `02.Area/A. 논문연구 주제 정리/`
+- `02.Area/B. 일정관리/`
+- `03.Resource/`
 
-대시보드에서 **볼트 연결**을 클릭하면 위 폴더들을 재귀 스캔하여 frontmatter에 `agent: <id>` 가 있는 파일을 결과로 인식하고, 다음 위젯에 표시합니다:
+대시보드에서 **볼트 연결**을 클릭하면 위 폴더들을 재귀(depth 3) 스캔하여 frontmatter에 `agent: <id>` 가 있는 파일을 결과로 인식하고, 다음 위젯에 표시합니다:
 
-- **홈 화면**: "최근 에이전트 결과" 카드 (최신 8개) + 상단 요약 카드(에이전트 결과 누적·투자 분석/브리핑)
+- **홈 화면**: "최근 에이전트 결과" 카드 (최신 8개) + 상단 요약 카드(에이전트 결과 누적)
 - **에이전트 모달**: 해당 에이전트의 결과 파일 최신 5개 (제목 · 날짜 · 미리보기)
 
 > 결과 파일은 대시보드가 직접 만들지 않습니다. Cowork/Claude Code에서 사용자가 프롬프트를 실행한 결과를 Vault에 저장하면, Obsidian Git이 동기화한 후 대시보드가 표시합니다.

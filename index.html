@@ -1892,8 +1892,6 @@ function renderHome() {
         const total  = allRes.length;
         const todayKey = fmt(today);
         const todayCnt = allRes.filter(r => (r.frontmatter.created || r.mtime) === todayKey).length;
-        // "투자" 그룹 결과 (Nasdaq · KOSPI 폴더 기반)
-        const invCnt = allRes.filter(r => (r.folder || '').includes('투자')).length;
         return `
         <div class="summary-card">
           <div class="summary-icon blue"><i data-lucide="file-text" style="width:20px;height:20px"></i></div>
@@ -1901,14 +1899,6 @@ function renderHome() {
             <div class="summary-value">${total}</div>
             <div class="summary-label">에이전트 결과</div>
             <div class="summary-sub">${isObs && obsConnectedHome ? `오늘 ${todayCnt}개 신규` : 'Vault 미연결'}</div>
-          </div>
-        </div>
-        <div class="summary-card">
-          <div class="summary-icon yellow"><i data-lucide="trending-up" style="width:20px;height:20px"></i></div>
-          <div>
-            <div class="summary-value">${invCnt}</div>
-            <div class="summary-label">투자 분석/브리핑</div>
-            <div class="summary-sub" style="color:${invCnt>0?'var(--success)':'var(--text-muted)'}">${invCnt>0?'누적 결과':'아직 없음'}</div>
           </div>
         </div>
         `;
@@ -1975,11 +1965,11 @@ function renderHome() {
     <div class="card" style="margin-top:24px">
       <div class="card-header">
         <div class="card-title"><i data-lucide="terminal" style="width:16px;height:16px"></i> 빠른 명령</div>
-        <div class="card-subtitle">키워드로 에이전트를 자동 매칭합니다 (예: "포트폴리오 브리핑")</div>
+        <div class="card-subtitle">키워드로 에이전트를 자동 매칭합니다 (예: "주간 업무 보고", "자료조사")</div>
       </div>
       <div class="command-input-wrap">
         <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--accent);flex-shrink:0"></i>
-        <input type="text" placeholder="예: 포트폴리오 브리핑, 자료조사, 주간 보고 작성..." id="quickCommand" onkeydown="if(event.key==='Enter')handleCommand()">
+        <input type="text" placeholder="예: 자료조사, 논문 초안, 주간 보고 작성, 발표자료 슬라이드..." id="quickCommand" onkeydown="if(event.key==='Enter')handleCommand()">
         <button class="btn btn-primary btn-sm" onclick="handleCommand()">실행</button>
       </div>
     </div>
@@ -2062,8 +2052,6 @@ function handleCommand() {
 
   // 키워드 기반 에이전트 매칭 (간단한 규칙)
   const rules = [
-    { keys:['브리핑','briefing','포트폴리오','오늘 시장','주간 시장'], id:'portfolio-brief' },
-    { keys:['종목 분석','분석해','tier','티어','can slim','vcp'],     id:'investment-analyzer' },
     { keys:['논문','paper','초안','abstract','introduction'],          id:'paper-writer' },
     { keys:['자료조사','조사해','리서치','선행연구','review'],          id:'research-collector' },
     { keys:['시뮬레이션','sfm','digital twin','디지털 트윈'],          id:'simulation-research' },
