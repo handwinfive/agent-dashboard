@@ -64,7 +64,7 @@ group_name: 연구 / 논문
 ```yaml
 ---
 agent: simulation-research
-created: 2026-05-03
+created: 2026-05-04
 title: <한 줄 제목>
 inputs_summary: {goal}
 tags: [agent-result]

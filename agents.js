@@ -1,7 +1,7 @@
 /* ==============================================================
    AGENT REGISTRY  (Agent Workbench)
    ──────────────────────────────────────────────────────────────
-   - 9개 업무지원 에이전트 정의 (3그룹: 연구/논문 · 투자 · 업무)
+   - 11개 업무지원 에이전트 정의 (3그룹: 연구/논문 · 업무 · 지식관리)
    - 각 에이전트: 입력 폼 스키마 + 프롬프트 빌더 + Vault 경로 힌트
    - AgentLayer  : localStorage 기반 실행 이력 저장
    - AgentModule : 카드 렌더, 모달 입력, 프롬프트 생성·복사
@@ -12,7 +12,9 @@ const AGENT_GROUPS = [
   { id: 'research',  name: '연구 / 논문', icon: 'flask-conical', color: 'blue',
     description: 'KRRI 연구 · 논문 · 시뮬레이션 보조' },
   { id: 'work',      name: '업무',         icon: 'briefcase',     color: 'purple',
-    description: '기획서 · 발표자료 · 보고 · 실적관리' }
+    description: '기획서 · 발표자료 · 보고 · 실적관리' },
+  { id: 'knowledge', name: '지식관리',     icon: 'book-open',     color: 'green',
+    description: 'Vault 데일리·주간·논문요약 — km-master 하위 하네스' }
 ];
 
 /* ───────── Vault 표준 경로 (실제 Vault 구조 반영) ─────────
@@ -21,10 +23,12 @@ const AGENT_GROUPS = [
 const VAULT_PATHS = {
   root:           '~/Vaults/MyVault',
   daily:          '02.Area/B. 일정관리/',
-  weekly:         '02.Area/B. 일정관리/',
+  daily_notes:    '02.Area/B. 일정관리/Daily/',
+  weekly:         '02.Area/B. 일정관리/Weekly/',
   research:       '01.Project/A. (국가R&D) 환승역사/',
   area_research:  '02.Area/A. 논문연구 주제 정리/',
   reading:        '03.Resource/',
+  reading_papers: '03.Resource/Reading/',
   attachments:    '04.Archive/Attachments/'
 };
 
@@ -351,6 +355,329 @@ ${v.targets || '(미설정 - 함께 제안 요청)'}
 5. **CV/Personal Statement 반영 시 강조 포인트**
 
 저장 권장: \`${VAULT_PATHS.area_research}${v.year}-실적.md\``;
+    }
+  },
+
+  /* ─────────── 8. KM 마스터 (지식관리 라우터) ─────────── */
+  {
+    id: 'km-master',
+    groupId: 'knowledge',
+    name: 'KM 마스터',
+    icon: 'compass',
+    tagline: '지식관리 자연어 요청 → 서브에이전트 라우팅',
+    description: '"오늘 데일리 만들어줘" / "이번 주 어땠어?" / "이 논문 정리" 같은 자연어 요청을 받아 적절한 서브에이전트(daily-curator 등)에 위임할 호출 계획을 만든다. 하네스 엔지니어링의 마스터 역할.',
+    inputs: [
+      { id: 'request', label: '자연어 요청',     type: 'textarea', required: true,
+        placeholder: '예: 오늘 데일리 노트 만들어줘 / 이번 주 어땠어? / 이 논문 정리해줘' },
+      { id: 'context', label: '추가 컨텍스트(선택)', type: 'textarea', required: false,
+        placeholder: '예: 어제 회의 많았음 / 첨부 PDF 있음' }
+    ],
+    outputHint: '판단 요약 + 서브에이전트 호출 계획 (사용자 확인 후 실행)',
+    vaultSavePath: VAULT_PATHS.daily,
+    buildPrompt(v) {
+      return `${COMMON_PROMPT_HEADER}
+# 작업: 지식관리(KM) 도메인 라우팅
+
+당신은 손승오의 지식관리(Knowledge Management) 도메인을 책임지는 마스터 에이전트다. 사용자 요청을 받아 어느 서브에이전트(들)를 어떤 입력으로 호출해야 하는지 결정한다.
+
+## 사용자 요청
+${v.request}
+
+## 추가 컨텍스트
+${v.context || '(없음)'}
+
+## 활용 가능한 서브에이전트
+- **daily-curator** — 오늘 또는 특정 날짜의 데일리 노트 생성·갱신
+  - 입력: \`date\` (YYYY-MM-DD 또는 "오늘"), \`focus\` (선택), \`mood\` (선택)
+- **weekly-reviewer** — 주간 리뷰 초안 (지난 5일치 데일리 종합)
+  - 입력: \`week\` (YYYY-Www), \`projects\` (선택)
+- **paper-summarizer** — 논문 PDF/DOI/URL을 한국어 요약으로 → \`03.Resource/Reading/\`
+  - 입력: \`source\` (URL/DOI/파일명), \`angle\` (선택)
+- **vault-cleaner** — 백링크 누락·고아 노트·태그 오타 점검
+  - 입력: \`scope\` (Vault 전체/특정 폴더)
+
+## 출력 형식
+
+### 1. 판단 요약 (한 단락)
+요청을 어떻게 해석했고, 왜 그 서브를 선택했는지.
+
+### 2. 호출 계획
+선택한 서브가 1개면 단일 블록, 여러 개면 순서/병렬 표시.
+
+\`\`\`
+호출 1: <agent-id>
+  <input1>: <값>
+  <input2>: <값>
+\`\`\`
+
+### 3. 모르겠으면
+요청이 모호하면 호출 계획 대신 **"명확화 질문 1개"**를 출력. 두 개 이상 묻지 말 것.
+
+### 4. 마지막 한 줄
+"이대로 진행할까요? (예/아니오/수정)"
+
+## 운영 원칙
+- 외부 발신(메일/슬랙)은 절대 자동 결정하지 않는다.
+- 파일 변경은 항상 dry-run → diff 표시 → 사용자 승인 흐름.
+- CLAUDE.md를 컨텍스트로 우선시한다 (Vault 톤 일관성).
+
+저장 권장: \`${VAULT_PATHS.daily}\` (라우팅 결과 자체는 보통 저장 불필요, 실행한 서브의 결과만 저장)`;
+    }
+  },
+
+  /* ─────────── 9. 주간 리뷰어 ─────────── */
+  {
+    id: 'weekly-reviewer',
+    groupId: 'knowledge',
+    name: '주간 리뷰어',
+    icon: 'calendar-check',
+    tagline: '5일치 데일리 → 주간 리뷰 초안',
+    description: '지난 5~7일치 데일리 노트와 진행 중 프로젝트를 종합해 주간 리뷰 초안을 만든다. 일요일 19:00 자동 실행 가정.',
+    inputs: [
+      { id: 'week',     label: '대상 주 (YYYY-Www)', type: 'text',     default: '이번 주',
+        placeholder: '예: 2026-W19 (이번 주는 비워둬도 됨)' },
+      { id: 'projects', label: '주요 프로젝트(선택)',  type: 'textarea', required: false,
+        placeholder: '미입력 시 01.Project/ 인덱스에서 자동 추출' },
+      { id: 'tone',     label: '톤',                  type: 'select',   default: '내부 기록용',
+        options: ['내부 기록용','팀장 보고용','자기 돌아보기'] }
+    ],
+    outputHint: '주간 리뷰 markdown (frontmatter 포함)',
+    vaultSavePath: VAULT_PATHS.weekly,
+    buildPrompt(v) {
+      return `${COMMON_PROMPT_HEADER}
+# 작업: 주간 리뷰 초안 작성
+
+대상 주: ${v.week || '이번 주'}
+주요 프로젝트: ${v.projects || '(자동 추출)'}
+톤: ${v.tone || '내부 기록용'}
+
+## 절차
+
+1. **주차 정규화**: "이번 주"면 시스템 today에서 ISO week 계산 → YYYY-Www. 월~일 범위 명시 (예: 2026-W19, 05/04~05/10).
+
+2. **데이터 수집** (가능한 범위, 부족하면 부족분 명시)
+   - 해당 주 데일리 노트: \`${VAULT_PATHS.daily_notes}\` 아래 5~7개
+     - "🎯 오늘의 초점", "📝 작업 로그", "💡 떠오른 생각", "📚 오늘 읽은 것", "🔁 내일로 이월" 종합
+   - 진행 중 프로젝트: \`01.Project/*/00. README.md\` 또는 최상위 노트
+   - 직전 주 리뷰(있으면): "다음 주 우선순위" vs 이번 주 실제 달성
+
+3. **리뷰 구조 (CLAUDE.md 권장 + 확장)**
+
+\`\`\`markdown
+# YYYY-Www 주간 리뷰 (MM/DD ~ MM/DD)
+
+## 1. 이번 주 연구 진척 (KRRI / 논문)
+프로젝트별 진행 정량/정성. 가능한 한 수치 (커밋 수, 페이지, 회의 횟수 등).
+
+## 2. 이번 주 그 외
+- 📚 읽은 자료·배움
+- 💡 떠오른 아이디어 / 메모
+
+## 3. 회고
+- 잘된 것 (2~3개)
+- 아쉬웠던 것 (2~3개)
+- 배운 것 (1~2개)
+
+## 4. 다음 주 3대 우선순위
+- [ ] ...
+- [ ] ...
+- [ ] ...
+
+## 5. 부록
+- 미완료·이월 항목 수
+- 직전 주 우선순위 달성률 (있으면 %)
+\`\`\`
+
+4. **frontmatter (필수)**
+
+\`\`\`yaml
+---
+agent: weekly-reviewer
+created: <YYYY-MM-DD>
+title: <YYYY-Www> 주간 리뷰
+inputs_summary: <톤> · <프로젝트 첫 줄>
+tags: [agent-result, weekly]
+---
+\`\`\`
+
+5. **저장 위치**: \`${VAULT_PATHS.weekly}<YYYY-Www>.md\`
+
+## 톤 가이드
+- **내부 기록용**: 1인칭, 솔직, 미완은 미완으로
+- **팀장 보고용**: 능동·정량, 이슈/리스크 명시
+- **자기 돌아보기**: 감정·맥락 포함, 짧은 회고 OK
+
+## 데일리 부족 시 처리
+- 5일 이하: 사실 명시 + 있는 것만으로 작성
+- 0일: "데일리 부재 — 프로젝트 인덱스 + 체감 회고로 대체" 모드
+
+## 출력
+완성된 주간 리뷰 markdown 한 덩어리만 (설명 X).`;
+    }
+  },
+
+  /* ─────────── 10. 데일리 큐레이터 ─────────── */
+  {
+    id: 'daily-curator',
+    groupId: 'knowledge',
+    name: '데일리 큐레이터',
+    icon: 'sun',
+    tagline: '오늘의 데일리 노트 자동 초안',
+    description: '어제 데일리 노트의 이월 항목 + 진행 중 프로젝트 + 입력 초점을 종합해 CLAUDE.md 데일리 템플릿에 따른 데일리 노트를 생성한다.',
+    inputs: [
+      { id: 'date',   label: '대상 날짜',         type: 'text',     default: '오늘',
+        placeholder: 'YYYY-MM-DD 또는 "오늘"' },
+      { id: 'focus',  label: '오늘의 초점(선택)',  type: 'textarea', required: false,
+        placeholder: '미입력 시 어제 이월에서 자동 추출. 예: GTX 보고서 마감 / 논문 X 리뷰' },
+      { id: 'mood',   label: '컨디션·메모(선택)',  type: 'text',     required: false,
+        placeholder: '예: 오전 회의 3건 / 코어타임 14-17시' }
+    ],
+    outputHint: '데일리 노트 markdown (frontmatter 포함, 즉시 Vault에 저장 가능)',
+    vaultSavePath: VAULT_PATHS.daily_notes,
+    buildPrompt(v) {
+      return `${COMMON_PROMPT_HEADER}
+# 작업: 데일리 노트 생성
+
+대상 날짜: ${v.date || '오늘'}
+사용자 입력 초점: ${v.focus || '(없음 — 어제 이월에서 추출)'}
+컨디션·메모: ${v.mood || '(없음)'}
+
+## 절차
+
+1. **날짜 정규화**: "오늘"이면 시스템 today를 YYYY-MM-DD로. 요일도 한글로 (예: 월요일).
+
+2. **데이터 수집** (가능한 범위, 실패해도 계속 진행)
+   - 어제 데일리 노트: \`${VAULT_PATHS.daily_notes}<어제>.md\`
+     - "🔁 내일로 이월" 섹션의 미완료 [ ] 항목 추출
+   - 진행 중 프로젝트 인덱스: \`01.Project/*/00. README.md\` 또는 최상위 노트 (있으면)
+   - 오늘 캘린더 일정: 가능한 경우, 없으면 비워둠
+
+3. **CLAUDE.md 데일리 템플릿 준수**
+
+\`\`\`markdown
+# YYYY-MM-DD (요일)
+
+> _컨디션: <컨디션 메모>_   ← 입력이 있을 때만
+
+> _진행 중: <프로젝트 1~2개 요약>_   ← 컨텍스트 힌트
+
+## 🎯 오늘의 초점 (3개 이내)
+- [ ] ...
+- [ ] ...
+- [ ] ...
+
+## 📝 작업 로그
+_(아침에는 비움, 저녁에 채움)_
+
+## 💡 떠오른 생각
+
+## 📚 오늘 읽은 것
+
+## 🔁 내일로 이월
+_(없으면: "이월 없음")_
+\`\`\`
+
+4. **초점 결정 우선순위**
+   - (a) 사용자 입력 \`focus\`가 있으면 그것을 그대로 분해해서 3개 이내 [ ]로
+   - (b) 없으면 어제 이월 항목 중 우선순위 상위 3개
+   - (c) 둘 다 없으면 빈 [ ] 3줄만 (사용자가 채우도록)
+
+5. **frontmatter (필수)**
+   파일 맨 위에 다음 frontmatter 포함:
+
+\`\`\`yaml
+---
+agent: daily-curator
+created: <YYYY-MM-DD>
+title: <YYYY-MM-DD> 데일리 노트
+inputs_summary: <focus 첫 줄 또는 "데일리 자동 생성">
+tags: [agent-result, daily]
+---
+\`\`\`
+
+6. **저장 위치**: \`${VAULT_PATHS.daily_notes}<YYYY-MM-DD>.md\`
+
+## 출력
+- 완성된 데일리 노트 markdown 한 덩어리만 출력 (설명 X)
+- 이월 항목이 없으면 그 사실을 \`이월 없음\`으로 명시
+- 사용자가 그대로 Vault에 저장하거나 1~2줄 다듬기만 하면 되도록`;
+    }
+  },
+
+  /* ─────────── 11. 논문 요약기 (Paper Summarizer) ─────────── */
+  {
+    id: 'paper-summarizer',
+    groupId: 'knowledge',
+    name: '논문 요약기',
+    icon: 'book-marked',
+    tagline: '논문 PDF/DOI/URL → 한국어 요약 + 연구 연결점',
+    description: '논문 한 편의 핵심 5문장, 한국어 요약, 손승오의 SFM × GTX × 디지털 트윈 연구 정체성과의 연결점을 정리한다. Gemini Deep Research 권장.',
+    inputs: [
+      { id: 'source', label: '논문 출처', type: 'textarea', required: true,
+        placeholder: 'PDF 경로 / DOI / URL / 또는 본문 직접 붙여넣기' },
+      { id: 'focus',  label: '특히 알고 싶은 점(선택)', type: 'textarea', required: false,
+        placeholder: '예: 캘리브레이션 방법, 데이터셋 규모, 한계점' },
+      { id: 'tone',   label: '요약 깊이', type: 'select', default: '표준',
+        options: ['짧게 (300자)', '표준', '정밀 (방법론 포함)'] }
+    ],
+    outputHint: '논문 요약 markdown (frontmatter 포함, 03.Resource/Reading/ 저장 가능)',
+    vaultSavePath: VAULT_PATHS.reading_papers,
+    buildPrompt(v) {
+      return `${COMMON_PROMPT_HEADER}
+# 작업: 논문 요약 + 연구 연결점
+
+## 입력
+- 출처: ${v.source}
+- 사용자 관심 포인트: ${v.focus || '(없음 — 일반 요약)'}
+- 요약 깊이: ${v.tone || '표준'}
+
+## 절차
+
+1. **메타데이터 추출**: 제목, 저자, 발표 venue, 연도, DOI(있으면). 출처가 URL/DOI인데 접근 불가하면 명시.
+
+2. **핵심 5문장**: 논문 한 편을 읽지 않은 사람이 5문장만으로 핵심을 파악할 수 있도록.
+   - 1문장: 무엇을 풀려고 하는가 (문제)
+   - 2문장: 기존 방법의 한계
+   - 3문장: 이 논문의 접근
+   - 4문장: 핵심 결과 (수치 1~2개)
+   - 5문장: 시사점/한계
+
+3. **한국어 요약** (${v.tone || '표준'} 깊이)
+   - 짧게: 300자 내, 결론 중심
+   - 표준: 600~800자, 방법·결과 균형
+   - 정밀: 1500자 내, 방법론·실험 셋업·한계 포함
+
+4. **연구 정체성 연결점** (가장 중요)
+   - 손승오의 축: **SFM × GTX/대심도 지하역사 × LiDAR/RGB-D × AI 디지털 트윈**
+   - 이 논문이 위 축 중 어디에 닿는가? 닿는다면 어떻게 활용 가능한가?
+   - 손승오의 진행 중 프로젝트(GTX 환승센터 디지털 트윈, 서울역 디지털 트윈)와의 직접 연결 1~2개
+   - 닿지 않으면 솔직히 "직접 연결 약함"이라고 명시
+
+5. **인용/참고 후보**
+   - 이 논문이 인용한 references 중 손승오가 추가로 봐야 할 1~3편
+   - DOI 또는 제목 형태로
+
+6. **저장 frontmatter**
+
+\`\`\`yaml
+---
+agent: paper-summarizer
+created: <YYYY-MM-DD>
+title: <논문 제목>
+authors: <저자>
+venue: <저널/학회>
+year: <연도>
+doi: <DOI>
+tags: [agent-result, paper, reading]
+relevance: <high/medium/low>   # 연구 정체성 연결도
+---
+\`\`\`
+
+7. **저장 위치 제안**: \`${VAULT_PATHS.reading_papers}<YYYY-MM-DD>-<slug>.md\` (slug는 영문 키워드 3~4단어 kebab-case)
+
+## 출력
+- 완성된 markdown 한 덩어리 (frontmatter + 본문)
+- 출처가 PDF 파일 경로지만 접근이 안 될 경우 그 사실을 첫 줄에 명시하고 메타데이터/요약은 사용자에게 텍스트 붙여넣기 요청`;
     }
   }
 ];

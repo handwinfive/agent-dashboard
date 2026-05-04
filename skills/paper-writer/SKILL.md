@@ -71,7 +71,7 @@ Nature/IEEE 스타일 가이드를 따라 Abstract/Introduction/Methods/Results/
 ```yaml
 ---
 agent: paper-writer
-created: 2026-05-03
+created: 2026-05-04
 title: <한 줄 제목>
 inputs_summary: {title}
 tags: [agent-result]

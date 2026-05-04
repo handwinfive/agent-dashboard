@@ -23,7 +23,7 @@ Daily/Weekly 노트를 종합해 일일·주간·월간 업무보고를 작성�
   - 타입: select
 
 ## Vault 저장 권장 위치
-`02.Area/B. 일정관리/`
+`02.Area/B. 일정관리/Weekly/`
 
 ## 출력 형식
 업무보고 문서 (Markdown → docx 변환 가능)
@@ -46,7 +46,7 @@ Daily/Weekly 노트를 종합해 일일·주간·월간 업무보고를 작성�
 
 ## 데이터 출처 (Vault에서 종합)
 - 02.Area/B. 일정관리/ 의 해당 기간 데일리 노트
-- 02.Area/B. 일정관리/ 의 직전 주간 리뷰
+- 02.Area/B. 일정관리/Weekly/ 의 직전 주간 리뷰
 - 관련 프로젝트 노트: 01.Project/A. (국가R&D) 환승역사/
 
 ## 출력 구조
@@ -62,7 +62,7 @@ Daily/Weekly 노트를 종합해 일일·주간·월간 업무보고를 작성�
 - "~하였음" 단정형보다 "~를 진행, ~결과 확인" 흐름
 - 보고 대상이 {audience}일 때 의사결정에 도움되는 정보 우선
 
-저장 권장: `02.Area/B. 일정관리/YYYY-Www-report.md`
+저장 권장: `02.Area/B. 일정관리/Weekly/YYYY-Www-report.md`
 
 ---
 
@@ -73,7 +73,7 @@ Daily/Weekly 노트를 종합해 일일·주간·월간 업무보고를 작성�
 ```yaml
 ---
 agent: work-report-writer
-created: 2026-05-03
+created: 2026-05-04
 title: <한 줄 제목>
 inputs_summary: {period}
 tags: [agent-result]
